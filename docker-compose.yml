@@ -1,0 +1,161 @@
+#
+# StudioIT presents "All-in-one PHP docker"
+# https://github.com/dawidofed/studioit-aoiphp-docker
+#
+# Please use as-is - or change something, if you will :)
+#
+
+version: '3.7'
+
+services:
+  # web server
+  nginx:
+    container_name: nginx
+    image: nginx
+    env_file:
+      - .env
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8080:80"
+      - "443:443"
+      - "9000:9000"
+    links:
+      - php
+      - mailhog
+    depends_on:
+      - php
+      - mysql
+    environment:
+      - NGINX_HOST=aiophp.localhost
+      - NGINX_PORT=80
+    volumes:
+      - ./src:/var/www/html
+      - ./sites/default.conf:/etc/nginx/conf.d/default.conf
+      - ./logs/nginx:/var/log/nginx:cached
+    networks:
+      - studioit_aiophp
+
+  # PHP by conf/php/Dockerfile
+  php:
+    container_name: php
+    build: ./conf/php
+    #image: php:7.4-fpm
+    env_file:
+      - .env
+    restart: unless-stopped
+    links:
+      - mysql
+      - redis
+      - elasticsearch
+      - rabbitmq
+      - mailhog
+    depends_on:
+      - mysql
+    volumes:
+      - ./conf/php/php.ini:/usr/local/etc/php/conf.d/php.ini
+      - ./conf/php/xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini
+      - ./logs/php:/var/log:cached
+      - ./src:/var/www/html
+    extra_hosts:
+      - "local_host:${LOCAL_ADDR_IP}"
+    networks:
+      - studioit_aiophp
+
+  # MySQL
+  mysql:
+    container_name: mysql
+    image: mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - ./conf/mysql/mysql.cnf:/etc/mysql/conf.d/mysql.cnf
+      - ./volumes/mysql:/var/lib/mysql
+      - ./logs/mysql:/var/log/mysql:cached
+    networks:
+      - studioit_aiophp
+
+  # Mailhog - simple mail-catcher
+  mailhog:
+    container_name: mailhog
+    image: mailhog/mailhog
+    user: root
+    restart: unless-stopped
+    logging:
+      driver: 'none'
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - studioit_aiophp
+
+  # Redis
+  redis:
+    container_name: redis
+    image: redis:5.0
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+      - "6378:6378"
+    volumes:
+      - ./logs/redis:/var/log/redis/redis-server.log
+    networks:
+      - studioit_aiophp
+
+  # Elasticsearch
+  elasticsearch:
+    container_name: elasticsearch
+    image: elasticsearch:7.9.0
+    restart: unless-stopped
+    environment:
+      - xpack.security.enabled=false
+      - http.host=0.0.0.0
+      - transport.host=0.0.0.0
+      - TZ=Europe/Warsaw
+      - cluster.name=docker-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    #mem_limit: 1g
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - studioit_aiophp
+    ports:
+      - "9200:9200"
+    volumes:
+      - ./logs/elasticsearch:/usr/share/elasticsearch/logs
+      #- ./logs/elasticsearch:/var/log/elasticsearch:cached
+      - ./volumes/elasticsearch:/var/lib/elasticsearch:cached
+
+  # RabbitMQ
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3.8.10
+    restart: unless-stopped
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    volumes:
+      - ./volumes/rabbitmq:/var/lib/rabbitmq
+    networks:
+      - studioit_aiophp
+
+
+networks:
+  studioit_aiophp:
+    driver: host
+    external: true
