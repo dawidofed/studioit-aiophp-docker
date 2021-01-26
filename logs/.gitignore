@@ -1,0 +1,10 @@
+!/elasticsearch
+!/elasticsearch/.gitignore
+!/mysql
+!/mysql/.gitignore
+!/nginx
+!/nginx/.gitignore
+!/php
+!/php/.gitignore
+!/redis
+!/redis/.gitignore
