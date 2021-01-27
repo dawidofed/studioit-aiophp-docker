@@ -1,3 +1,4 @@
 /.idea
 !/volumes
 /src/*
+!/src/public/index.php
